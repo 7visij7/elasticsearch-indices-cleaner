@@ -1,0 +1,40 @@
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: elasticsearch-indices-cleaner
+  namespace: elasticsearch-indices-cleaner
+  labels:
+    app: elasticsearch-indices-cleaner
+spec:
+  schedule: "0 10 * * *"
+  concurrencyPolicy: "Forbid"
+  failedJobsHistoryLimit: 2
+  successfulJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: elasticsearch-indices-cleaner
+        spec:
+          containers:
+            - image: ${registry}/elasticsearch-indices-cleaner/elasticsearch-indices-cleaner:23653
+              imagePullPolicy: Always
+              name: elasticsearch-indices-cleaner
+              resources:
+                requests:
+                  cpu: "100m"
+                  memory: "100Mi"
+                limits:
+                  memory: "100Mi"
+                  cpu: "100m"
+              envFrom:
+              - secretRef:
+                  name: env-list
+          imagePullSecrets:
+            - name: secret-registry
+          restartPolicy: "Never"
+          schedulerName: default-scheduler
+          securityContext: {}
+          terminationGracePeriodSeconds: 30
+          

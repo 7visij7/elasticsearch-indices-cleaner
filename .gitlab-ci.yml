@@ -1,0 +1,82 @@
+stages:
+  - build
+  - update_secret 
+  - deploy
+
+variables:
+  VAULT_ADDR: https://vault.puls.ru
+  VAULT_PATH: devops/elasticsearch/ilm 
+  VAULT_ROLE: devops-elasticsearch-ilm-read
+  KUBE_NAMESPACE: ${CI_PROJECT_NAME}
+  CRON_NAME: ${CI_PROJECT_NAME}
+  SECRET_NAME: env-list
+  SECRET_FILE: .env
+  SECRET_FILE_TMP: .env_tmp
+  BUILD_IMAGE: registry.puls.ru/${CI_PROJECT_NAME}/${CI_PROJECT_NAME}:${CI_PIPELINE_ID}
+  DOCKER_HOST: tcp://localhost:2375
+  DOCKER_TLS_CERTDIR: ""
+
+build:
+  stage: build
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [""]
+  before_script:
+    - mkdir -p ~/.docker
+    - echo "$DOCKER_AUTH_CONFIG" > ~/.docker/config.json
+  script:
+    - echo "$BUILD_IMAGE"
+    - /kaniko/executor --context $CI_PROJECT_DIR --dockerfile Dockerfile --destination $BUILD_IMAGE
+  tags:
+    - k8s-stage-gitlab
+  only:
+    - master
+
+.update_secret: &update_secret
+  stage: update_secret
+  image:
+    name: registry.puls.ru/kubectl
+    entrypoint: [""]
+  before_script:
+    - mkdir ~/.kube
+    - echo ${KUBE_CONFIG} | base64 -d > ~/.kube/config
+  script:
+    - export VAULT_TOKEN="$(vault write -field=token auth/jwt/login role=${VAULT_ROLE} jwt=$CI_JOB_JWT)"
+    - ./get_secret -path=${VAULT_PATH} -token=$VAULT_TOKEN > ${SECRET_FILE_TMP}
+    - sed -i '$!s/$/,/' ${SECRET_FILE_TMP}
+    - echo ILM=$(cat  ${SECRET_FILE_TMP} | xargs) >  ${SECRET_FILE}
+    - kubectl delete secrets ${SECRET_NAME} -n ${KUBE_NAMESPACE} --ignore-not-found
+    - kubectl create secret generic ${SECRET_NAME} --from-env-file=${SECRET_FILE} -n ${KUBE_NAMESPACE} 
+
+update_secret:stage:
+  <<: *update_secret
+  variables:
+    KUBE_CONFIG: ${KUBE_CONFIG_STAGE}
+  tags:
+    - k8s-stage-gitlab 
+  only:
+    - master
+     
+.deploy_template: &deploy_template
+  stage: deploy
+  needs: 
+    - build
+    - update_secret:stage
+  image:
+    name: registry.puls.ru/kubectl
+    entrypoint: [""]
+  before_script:
+    - mkdir ~/.kube
+    - echo ${KUBE_CONFIG} | base64 -d > ~/.kube/config
+  script:
+    - kubectl set image cronjob/${CRON_NAME} -n ${KUBE_NAMESPACE} ${CRON_NAME}=${BUILD_IMAGE} --record
+    
+deploy:stage:
+  <<: *deploy_template
+  variables:
+    KUBE_CONFIG: ${KUBE_CONFIG_STAGE}
+  tags:
+    - k8s-stage-gitlab 
+  only:
+    refs:
+      - master

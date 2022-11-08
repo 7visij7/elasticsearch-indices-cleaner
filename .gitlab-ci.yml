@@ -4,7 +4,7 @@ stages:
   - deploy
 
 variables:
-  VAULT_ADDR: https://vault.puls.ru
+  VAULT_ADDR: https://vault.company.com
   VAULT_PATH: devops/elasticsearch/ilm 
   VAULT_ROLE: devops-elasticsearch-ilm-read
   KUBE_NAMESPACE: ${CI_PROJECT_NAME}
@@ -12,7 +12,7 @@ variables:
   SECRET_NAME: env-list
   SECRET_FILE: .env
   SECRET_FILE_TMP: .env_tmp
-  BUILD_IMAGE: registry.puls.ru/${CI_PROJECT_NAME}/${CI_PROJECT_NAME}:${CI_PIPELINE_ID}
+  BUILD_IMAGE: registry.company.com/${CI_PROJECT_NAME}/${CI_PROJECT_NAME}:${CI_PIPELINE_ID}
   DOCKER_HOST: tcp://localhost:2375
   DOCKER_TLS_CERTDIR: ""
 
@@ -35,7 +35,7 @@ build:
 .update_secret: &update_secret
   stage: update_secret
   image:
-    name: registry.puls.ru/kubectl
+    name: registry.company.com/kubectl
     entrypoint: [""]
   before_script:
     - mkdir ~/.kube
@@ -63,7 +63,7 @@ update_secret:stage:
     - build
     - update_secret:stage
   image:
-    name: registry.puls.ru/kubectl
+    name: registry.company.com/kubectl
     entrypoint: [""]
   before_script:
     - mkdir ~/.kube

@@ -13,7 +13,7 @@ python app/index_cleaner.py --host $HOSTNAME --port $PORT --debug
 
 ---
 
-## Required variales
+## Required variables
 
 > Required enviroment variable ILM (indices life managmet), where store name of index and nubmers of days which index should stored. 
  
